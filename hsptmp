@@ -1,0 +1,321 @@
+#include "hgimg4.as"
+#include "hspmath.as"
+
+#define PI 3.14159265358979
+
+#define DIFF 0.05
+
+#define X 10
+#define Y 10
+#define Z 3
+
+assert
+
+gosub *init_window
+gosub *init_var
+gosub *init_texture
+gosub *init_world
+gosub *init_block
+gosub *init_position
+
+goto *main
+
+*main
+repeat
+	redraw 0			; •`‰æŠJŽn
+
+	gosub *input_keyboard
+	
+	gosub *check_position
+
+	;addang id_model,0,0.01,0.02	; ƒm[ƒh‰ñ“]
+	gpdraw				; ƒV[ƒ“‚Ì•`‰æ
+	
+	gosub *draw_message
+	;color 255,255,255
+	;pos 8,8: mes "Opened door"
+
+	redraw 1			; •`‰æI—¹
+	await 1000/60			; ‘Ò‚¿ŽžŠÔ
+loop
+
+; Init window and graphic context
+*init_window
+	title ""
+	gpreset
+	setcls CLSMODE_SOLID, $BAE3F9		; ‰æ–ÊƒNƒŠƒAÝ’è
+	return
+
+; Init variables
+*init_var
+	dim flag, 2
+	message = ""
+	message_time = -1
+	return
+
+; Init and load textures
+*init_texture
+	dim texture_ids, 20
+	dim block_ids, 20
+	
+	gptexmat texture_ids(1), "res/blocks/stone.png", GPOBJ_MATOPT_NOLIGHT
+	gptexmat texture_ids(2), "res/blocks/dirt.png", GPOBJ_MATOPT_NOLIGHT
+	gptexmat texture_ids(3), "res/blocks/diamond_block.png", GPOBJ_MATOPT_NOLIGHT
+	gptexmat texture_ids(4), "res/blocks/cobblestone.png", GPOBJ_MATOPT_NOLIGHT
+
+	repeat 4
+		gpbox block_ids(cnt + 1), 1, -1, texture_ids(cnt + 1)
+		setpos block_ids(cnt + 1), 0, 0, -1
+	loop
+	;gpbox global, 1, -1, texture_ids(1)
+	;setscale global, 0.1, 0.1, 0.1
+	return
+
+; Init world blocks
+*init_block
+	dim blocks, X, Y, Z
+	repeat X
+		_x = cnt
+		repeat Y
+			_y = cnt
+			repeat Z
+				_z = cnt
+				_id = block_ids(world(_x, _y, _z))
+				if _id != 0 {
+					gpclone _b_id, block_ids(world(_x, _y, _z))
+					setpos _b_id, _x, _y, _z
+					blocks(_x, _y, _z) = _b_id					
+				}
+			loop
+		loop
+	loop
+	return
+
+; Init and load world
+*init_world
+	dim world, X, Y, Z
+	
+	sdim _world, (X * (Y + 2 /* CR+LF */) + 2) * Z
+
+	bload "res/world.txt", _world, 512, 0
+	repeat Z
+		_z = cnt
+		_skip_z = _z * (X * (Y + 2 /* CR+LF */) + 2 /* CR+LF */)
+		repeat Y
+			_y = cnt
+			_skip_y = _y * (Y + 2 /* CR+LF */)
+			_line = strmid(_world, _skip_z + _skip_y, X)
+			repeat X
+				_x = cnt
+				world(_x, Y - _y - 1, _z) = int(strmid(_line, _x, 1))
+			loop
+		loop
+	loop
+	return
+
+; Init first position in world
+*init_position
+	ddim position, 3
+	position.0 = 1.0
+	position.1 = 0.0
+	position.2 = 2.0
+	
+	ddim angle, 3
+	angle.0 = -1.5 * PI
+	angle.1 = 0.0
+	angle.2 = 0.0
+	
+	setpos GPOBJ_CAMERA, position.0, position.1, position.2
+	setang GPOBJ_CAMERA, angle.0, angle.1, angle.2
+	return
+
+; Input keyboard
+*input_keyboard
+	getkey _a, 65
+	getkey _d, 68
+	getkey _w, 87
+	getkey _s, 83
+	getkey _up, 38
+	getkey _down, 40
+	getkey _left, 37
+	getkey _right, 39
+	getkey _space, 32
+	
+
+	if _a == 1 & _d == 1{
+		; Push both
+		_moveAD = 0
+	} else : if _a != 1 & _d == 1 {
+		; Left
+		_moveAD = 0.2
+	} else : if _a == 1 & _d != 1 {
+		; Right
+		_moveAD = -0.2
+	} else {
+		; None
+		_moveAD = 0
+	}
+	
+	if _w == 1 & _s == 1{
+		; Push both
+		_moveWS = 0
+	} else : if _w == 1 & _s != 1 {
+		; Up
+		_moveWS = 0.2
+	} else : if _w != 1 & _s == 1 {
+		; Down
+		_moveWS = -0.2
+	} else {
+		; None
+		_moveWS = 0
+	}
+	
+	if _up == 1 & _down == 1{
+		; Push both
+		_angX = 0
+	} else : if _up == 1 & _down != 1 {
+		; Up
+		_angX = PI / 180
+	} else : if _up != 1 & _down == 1 {
+		; Down
+		_angX = - PI / 180
+	} else {
+		; None
+		_angX = 0
+	}
+	
+	if _left == 1 & _right == 1{
+		; Push both
+		_angY = 0
+	} else : if _left == 1 & _right != 1 {
+		; Left
+		_angY = 2.0 * PI / 180
+	} else : if _left != 1 & _right == 1 {
+		; Right
+		_angY = -2.0 * PI / 180
+	} else {
+		; None
+		_angY = 0
+	}
+	
+	if _space == 1{
+		_up = 0.2
+	} else {
+		_up = 0
+	}
+	
+	position.0 = position.0 + _moveAD * cos(angle.1)
+	position.1 = position.1 + _moveAD * sin(angle.1)
+	position.1 = position.1 - _moveWS * cos(PI - angle.1)
+	position.0 = position.0 - _moveWS * sin(PI - angle.1)
+	position.2 = position.2 + _up
+	
+	angle.0 = angle.0 + _angX
+	angle.1 = angle.1 + _angY
+	
+	_x = int(round(position.0))
+	_y = int(round(position.1))
+	
+	if _x == 0 {
+		_has_x_1 = 1
+	} else {
+		if world(_x - 1, _y, 1) != 0 {
+			_has_x_1 = 1
+		} else {
+			_has_x_1 = 0
+		}
+	}
+	if _x == 9 {
+		_has_x_2 = 1
+	} else {
+		if world(_x + 1, _y, 1) != 0 {
+			_has_x_2 = 1
+		} else {
+			_has_x_2 = 0
+		}
+	}
+	if _y == 0 {
+		_has_y_1 = 1
+	} else {
+		if world(_x, _y - 1, 1) != 0 {
+			_has_y_1 = 1
+		} else {
+			_has_y_1 = 0
+		}
+	}
+	if _y == 9 {
+		_has_y_2 = 1
+	} else {
+		if world(_x, _y + 1, 1) != 0 {
+			_has_y_2 = 1
+		} else {
+			_has_y_2 = 0
+		}
+	}
+	
+	logmes "X" + str(_has_x_1) + ", " + str(_has_x_2)
+	logmes "Y" + str(_has_y_1) + ", " + str(_has_y_2)
+	
+	
+	if _has_x_1 && double(_x - position.0) > DIFF {
+		position.0 = double(_x) - DIFF
+	}
+	if _has_x_2 && double(position.0 - _x) > DIFF {
+		position.0 = double(_x) + DIFF
+	}
+	if _has_y_1 && double(_y - position.1) > DIFF {
+		position.1 = double(_y) - DIFF
+	}
+	if _has_y_2 && double(position.1 - _y) > DIFF {
+		position.1 = double(_y) + DIFF
+	}
+	
+	
+	;_lookpos_x = position.0 + 2.0 * sin(angle.0) * cos(angle.1)
+	;_lookpos_y = position.1 + 2.0 * sin(angle.0) * sin(angle.1)
+	;_lookpos_z = position.2 + 2.0 * cos(angle.0)
+	
+;	angle.0 = angle.0 + _angX * cos(PI - angle.1)
+;	angle.2 = angle.2 + _angX * sin(PI - angle.1)
+	
+	;logmes "User" + str(position.0) + ", " + str(position.1) + ", " + str(position.2)
+	;logmes "Came" + str(_lookpos_x) + ", " + str(_lookpos_y) + ", " + str(_lookpos_z)
+
+	setpos GPOBJ_CAMERA, position.0, position.1, position.2
+	;gplookat GPOBJ_CAMERA, _lookpos_x, _lookpos_y, _lookpos_z
+	
+	;setpos global, _lookpos_x, _lookpos_y, _lookpos_z
+	setang GPOBJ_CAMERA, angle.0, angle.1, angle.2
+	return
+	
+*check_position
+	if round(position.0) == 8 && round(position.1) == 7 && flag.0 == 0{
+		flag.0 = 1
+		message = "The door has opened"
+		message_time = 120
+	
+		delobj blocks(6, 7, 1)
+		delobj blocks(6, 7, 2)
+		world(6, 7, 1) = 0
+		world(6, 7, 2) = 0
+	}
+	
+	if round(position.0) == 4 && round(position.1) == 1 && flag.1 == 0{
+		flag.1 = 1
+		message = "The door has opened"
+		message_time = 120
+	
+		delobj blocks(4, 3, 1)
+		delobj blocks(4, 3, 2)
+		world(4, 3, 1) = 0
+		world(4, 3, 2) = 0
+	}
+	return
+
+*draw_message
+	if message_time != -1 {
+		message_time = message_time - 1
+		color 0,0,0
+		pos 8,20: mes message
+	}
+	return
